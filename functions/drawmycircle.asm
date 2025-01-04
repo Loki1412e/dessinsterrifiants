@@ -48,10 +48,10 @@ section .bss
     window:         resq	1
     gc:		        resq	1
 
-    coord_x: resd    1
-    coord_y: resd    1
-    rayon:   resd    1
-    line_color:   resd    1
+    coord_x:        resd    1
+    coord_y:        resd    1
+    rayon:          resd    1
+    line_color:     resd    1
 
 ;===============================================================
 
