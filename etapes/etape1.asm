@@ -58,11 +58,11 @@ boucle_rand:
     movzx rcx, byte[i]
     mov dword[rbx + DWORD * rcx], eax
 
-    mov rdi, int_msg
-    movzx esi, byte[i]
-    mov edx, dword[circle_rxy + DWORD * rcx]
-    mov rax, 0
-    call printf
+    ; mov rdi, int_msg
+    ; movzx esi, byte[i]
+    ; mov edx, dword[circle_rxy + DWORD * rcx]
+    ; mov rax, 0
+    ; call printf
 inc byte[i]
 cmp byte[i], 3  ; max d'iterations (3 : r, x, y)
 jne boucle_rand
