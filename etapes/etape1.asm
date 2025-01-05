@@ -49,9 +49,9 @@ main:
 mov byte[i], 0
 mov dword[seed], 0
 boucle_rand:
-    mov edi, WIDTH / 2  ; Maximum
+    mov edi, WIDTH - 100  ; Maximum
     mov esi, dword[seed]
-    call random_number  ; Résultat return dans eax et la prochaine seed dans edx
+    call random_number    ; Résultat return dans eax et la prochaine seed dans edx
     mov dword[seed], edx
     
     mov rbx, circle_rxy
@@ -133,6 +133,7 @@ je closeDisplay						; on saute au label 'closeDisplay' qui ferme la fenêtre
 ;#########################################
 ;#		DEBUT DE LA ZONE DE DESSIN		 #
 ;#########################################
+
 dessin:
 
 mov rdi, qword[display_name]
@@ -143,6 +144,7 @@ mov r8d, dword[circle_rxy + DWORD * 1]  ; COORDONNEE en X DU CERCLE (dword)
 mov r9d, dword[circle_rxy + DWORD * 2]  ; COORDONNEE en Y DU CERCLE (dword)
 push 0xFFFFFF   ; COULEUR du crayon en hexa (dword mais en vrai -> 3 octets : 0xRRGGBB)
 call draw_circle
+
 
 ; ############################
 ; # FIN DE LA ZONE DE DESSIN #
