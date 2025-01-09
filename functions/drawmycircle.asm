@@ -15,10 +15,10 @@
 ;   - rdi -> [display_name]
 ;   - rsi -> [window]
 ;   - rdx -> [gc]
-;   - rcx -> [rayon]
-;   - r8  -> [coord_x]
-;   - r9  -> [coord_y]
-;   - Dans la pile : [rbp + QWORD * 2] -> line_color
+;   - cx -> [rayon]
+;   - r8w  -> [coord_x]
+;   - r9w  -> [coord_y]
+;   - Dans la pile : [rbp + QWORD * 2] -> line_color (dword)
 
 ;===============================================
 
@@ -31,9 +31,9 @@
 ; mov rdi, qword[display_name]
 ; mov rsi, qword[window]
 ; mov rdx, qword[gc]
-; mov ecx, 50           ; RAYON du CERCLE (dword)
-; mov r8d, WIDTH / 2    ; COORDONNEE en X DU CERCLE (dword)
-; mov r9d, HEIGHT / 2   ; COORDONNEE en Y DU CERCLE (dword)
+; mov cx, 50           ; RAYON du CERCLE (dword)
+; mov r8w, WIDTH / 2    ; COORDONNEE en X DU CERCLE (dword)
+; mov r9w, HEIGHT / 2   ; COORDONNEE en Y DU CERCLE (dword)
 ; push 0x00FF00         ; COULEUR du crayon en hexa (dword mais en vrai -> 3 octets : 0xRRGGBB)
 ; call draw_circle
 
@@ -48,30 +48,33 @@ section .bss
     window:         resq	1
     gc:		        resq	1
 
-    coord_x:        resd    1
-    coord_y:        resd    1
-    rayon:          resd    1
+    coord_x:        resw    1
+    coord_y:        resw    1
+    rayon:          resw    1
     line_color:     resd    1
 
 ;===============================================================
 
 section .text
 global draw_circle
-
 draw_circle:
     ; Début de la fonction
     push rbp
     mov rbp, rsp
 
+    ;=====================================
+
     ; Sauvegarde des  arguments
     mov qword[display_name], rdi
     mov qword[window], rsi
     mov qword[gc], rdx
-    mov dword[rayon], ecx
-    mov dword[coord_x], r8d
-    mov dword[coord_y], r9d
+    mov word[rayon], cx
+    mov word[coord_x], r8w
+    mov word[coord_y], r9w
     mov rdi, qword[rbp + QWORD * 2] ; arg 7 -> voir page 5 cours fonctions
     mov dword[line_color], edi
+
+    ;=====================================
 
     ; Couleur du cercle
     mov rdi, qword[display_name]
@@ -84,13 +87,13 @@ draw_circle:
     mov rsi, qword[window]		
     mov rdx, qword[gc]			
 
-    mov bx, word[coord_y]   ; COORDONNEE en Y DU CERCLE
+    mov bx, word[coord_x]   ; COORDONNEE en X DU CERCLE
 
     mov cx, word[rayon]     ; RAYON DU CERCLE
     sub bx, cx
     movzx rcx, bx			
 
-    mov bx, word[coord_x]	; COORDONNEE en X DU CERCLE
+    mov bx, word[coord_y]	; COORDONNEE en Y DU CERCLE
 
     mov r15w, word[rayon]	; RAYON DU CERCLE
     sub bx, r15w
@@ -103,7 +106,11 @@ draw_circle:
     push r9
     call XDrawArc
 
+    ;=====================================
+
     ; Fin de la fonction
     mov rsp, rbp
     pop rbp
     ret
+
+;===============================================================
