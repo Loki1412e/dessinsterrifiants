@@ -1,5 +1,5 @@
 ;##################################################
-;###########       Etape 2       ##################
+;###########       Etape 3       ##################
 ;##################################################
 
 ; my external functions from ./functions/
@@ -11,10 +11,11 @@ extern distance_points
 
 %include "etapes/common.asm"
 
-%define NB_CERCLES 24
-%define NB_CERCLES_INIT 4
+%define NB_CERCLES 100
+%define NB_CERCLES_INIT 10
 
 %define COLUMN_CIRCLES 3 ; { r , x , y }
+%define MAX_RAYON (WIDTH / 2)
 
 ;##################################################
 
@@ -39,6 +40,7 @@ section .data
     msg_start:  db  "--- DEBUT ---", 10, 10, 0
     msg_end:    db  "--- FIN ---", 10, 10, 0
     int_msg:    db  "%d : %d // %d", 10, 10, 0
+    coord_msg:  db  "x:%d y:%d // %d", 10, 10, 0
     msg_aled:   db  "ALED", 10, 10, 0
     test_msg:   db  "TEST MSG : %d", 10, 0
 
@@ -55,8 +57,6 @@ main:
 ; Mettez ici votre code qui devra s'exécuter avant le dessin
 ;###########################################################
 
-
-
 mov byte[i], 0
 boucle_cercle:
 
@@ -67,13 +67,6 @@ boucle_cercle:
     ; rax = i * COLUMN_CIRCLES
     mov rbx, rax
     ; rbx = i * COLUMN_CIRCLES
-
-    
-        mov rdi, test_msg
-        movzx rsi, byte[i]
-        mov rax, 0
-        call printf
-        
 
     ;=====================================
 
@@ -90,15 +83,17 @@ boucle_cercle:
         cmp byte[j], 0
         jne boucle_rand__xy
 
+        ; Si on défini le rayon d'un cercle init ou non
         cmp byte[i], NB_CERCLES_INIT
-        jb boucle_rand__r_INIT   
-        
-        ; Rayon max SUPER GRAND
-        mov ax, (WIDTH / 2) + 1
-        jmp post_random_number 
+        jb boucle_rand__rayon_init
 
-        boucle_rand__r_INIT:
-        mov di, WIDTH / 2   ; Rayon max CERCLE INIT random
+        ; rayon d'un cercle pas init : pas de random
+        mov ax, 0   ; on initialise à 0
+        jmp def_tmp
+
+        ; rayon d'un cercle init
+        boucle_rand__rayon_init:
+        mov di, MAX_RAYON   ; Rayon max CERCLE INIT random
         jmp boucle_rand_calcul
 
         boucle_rand__xy:
@@ -108,10 +103,8 @@ boucle_cercle:
         call random_number
         ; ax = random_number
 
-        post_random_number:
-
+        def_tmp:
         movzx rcx, byte[j] ; rcx = j
-
         mov word[tmp_circle_rxy + WORD * (rcx)], ax ; tmp[j] (word)
 
     inc byte[j]
@@ -135,7 +128,7 @@ boucle_cercle:
         movzx r8, byte[j]
         mov rax, COLUMN_CIRCLES
         mul r8      ; r8 *= rax
-        mov r8, rax ; r8 = j * COLUMN_CIRCLES
+        mov r8, rax ; r8 = j * COLUMN_CIRCLES        
 
         movzx rdi, word[circles_rxy + WORD * (r8 + 1)]  ; x1 -> cercle[j][1]
         movzx rsi, word[circles_rxy + WORD * (r8 + 2)]  ; y1 -> cercle[j][2]
@@ -144,38 +137,65 @@ boucle_cercle:
         call distance_points
         ; rax = la ditance entre les deux points
 
+        ;; Pour eviter de recalculer un nouveau cercle si le changement de rayon cause
+        ;; une collision avec un cercle pas encore calculer dans la boucle [j] :
+        
+        ; On verifie un cercle init la somme est de : tmp[0] + cercles[j][0]
+        cmp byte[i], NB_CERCLES_INIT
+        jb somme_rayons
+        ; Sinon le rayon de tmp est de 0, la somme est donc : cercles[j][0]
+        movzx rdx, word[circles_rxy + WORD * (r8)]  ; cercles[j][0] 
+        jmp distance_inferieure_rayon
+
+        somme_rayons:
         ; Somme des rayons
         movzx rdx, word[tmp_circle_rxy]             ; tmp_cercle[0]
         movzx rsi, word[circles_rxy + WORD * (r8)]  ; cercles[j][0]
         add rdx, rsi
         ; rdx = (somme des rayons) = (rayon_tmp + rayon_cerlce[j])
 
+        distance_inferieure_rayon:
         ; Si distance <= sum(rayons):
         cmp rax, rdx
         jbe cercle_est_en_collision
 
         ;------------------------------------------
-        
+
         ; On change le rayon pour etre tangent au cercle le plus proche
 
         ;------------------------------------------
-        
+
+        ; ; Si il s'agit d'un cercle init on ne change pas son rayon
         cmp byte[i], NB_CERCLES_INIT
         jb init_ou_pas_proche
 
-        movzx rdx, word[circles_rxy + WORD * (r8)]  ; rayon -> cercle[0]
-        sub rax, rdx    ; rax = distance - rayon
+        ; Si le rayon du cercle n'est pas égal à 0
+        ; On calcul le plus proche
+        cmp word[tmp_circle_rxy], 0
+        jne calc_proche
+        ; Sinon on initialise le rayon au max + 1 pour pouvoir calculer le plus proche
+        mov word[tmp_circle_rxy], MAX_RAYON + 1
 
+        calc_proche:
+        ; (distance - cerlces[j][0])
+        movzx rdx, word[circles_rxy + WORD * (r8)]  ; rayon -> cerlces[j][0]
+        ; rax = distance
+        ; rdx = cerlces[j][0] -> rayon
+        sub rax, rdx    ; rax = distance - rayon_cercle
+
+        ; Si (distance - rayon_cercle) >= tmp_rayon
+        ; Alors tmp_rayon ne change pas
         cmp ax, word[tmp_circle_rxy]
         jae init_ou_pas_proche
 
-        ; On change le rayon si il est plus petit
+        ; On change le rayon si le nouveau est plus petit
+        ; rax = nouveau rayon = (distance - rayon_cercle)
         mov word[tmp_circle_rxy], ax
 
         init_ou_pas_proche:
 
         ;------------------------------------------
-    
+
     inc byte[j]
     ; Si j == i alors on a déjà parcouru tout les cercles exsitants, on arrete la boucle
     mov al, byte[i]
@@ -297,8 +317,16 @@ boucle_dessin:
     mov r8w, word[circles_rxy + WORD * (rax + 1)]   ; circles_rxy[i][1] : COORDONNEE en X DU CERCLE (word)
     mov r9w, word[circles_rxy + WORD * (rax + 2)]   ; circles_rxy[i][2] : COORDONNEE en Y DU CERCLE (word)
 
-    push 0xFFFFFF   ; COULEUR du crayon en hexa (dword mais en vrai -> 3 octets : 0xRRGGBB)
-    
+    cmp byte[i], NB_CERCLES_INIT
+    jae color_white
+
+    push 0xFF0000   ; red
+    jmp dessiner_cercle
+
+    color_white:
+    push 0xFFFFFF   ; white : COULEUR du crayon en hexa (dword mais en vrai -> 3 octets : 0xRRGGBB)
+
+    dessiner_cercle:
     call draw_circle
 
 inc byte[i]
