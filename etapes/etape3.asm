@@ -347,18 +347,18 @@ je closeDisplay						; on saute au label 'closeDisplay' qui ferme la fenêtre
 
 dessin:
 
-;------------------------------------------
-;        Afficher le cercle externe
-;------------------------------------------
-    mov rdi, qword[display_name]
-    mov rsi, qword[window]
-    mov rdx, qword[gc]
-    mov cx,  word[extern_circle_rxy + WORD * 0]
-    mov r8w, word[extern_circle_rxy + WORD * 1]
-    mov r9w, word[extern_circle_rxy + WORD * 2]
-    push 0xFF00FF   ; purpule
-    call draw_circle
-;------------------------------------------
+; ;------------------------------------------
+; ;        Afficher le cercle externe
+; ;------------------------------------------
+;     mov rdi, qword[display_name]
+;     mov rsi, qword[window]
+;     mov rdx, qword[gc]
+;     mov cx,  word[extern_circle_rxy + WORD * 0]
+;     mov r8w, word[extern_circle_rxy + WORD * 1]
+;     mov r9w, word[extern_circle_rxy + WORD * 2]
+;     push 0xFF00FF   ; purpule
+;     call draw_circle
+; ;------------------------------------------
 
 mov byte[i], 0
 boucle_dessin:
