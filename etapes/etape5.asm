@@ -379,8 +379,8 @@ boucle_dessin:
 
     boucle_cercle_concentrique:
         
-        push rcx
-        push rax
+        push rcx ; on save le rayon
+        push rax ; on save (i * COLUMN_CIRCLES)
 
         mov rdi, qword[display_name]
         mov rsi, qword[window]
@@ -395,7 +395,7 @@ boucle_dessin:
         call draw_circle
         
         pop rcx     ; enlever 0xFF0000
-        pop rax     ; Save rax
+        pop rax     ; recupere (i * COLUMN_CIRCLES)
         pop rcx     ; recupere le rayon cx
 
         inc word[j]
