@@ -11,14 +11,16 @@ extern distance_points
 
 %include "etapes/common.asm"
 
-%define NB_CERCLES 700
+%define NB_CERCLES 1500
 %define NB_CERCLES_INIT 10
 
 %define COLUMN_CIRCLES 3 ; { r , x , y }
 
-%define DISTANCE_FENETRE_EXTERNE 200
+%define DISTANCE_FENETRE_EXTERNE 50
 %define RAYON_EXTERN (WIDTH - 2 * DISTANCE_FENETRE_EXTERNE) / 2
 %define MAX_XY (WIDTH - 2 * DISTANCE_FENETRE_EXTERNE)
+
+%define LEN_PALETTE 10
 
 ;##################################################
 
@@ -30,8 +32,8 @@ section .bss
     window:         resq	1
     gc:             resq	1
 
-    i:                  resb    1
-    j:                  resb    1
+    i:                  resw    1
+    j:                  resw    1
     circles_rxy:        resw    NB_CERCLES * COLUMN_CIRCLES   ; nb_de_cercles * { r , x , y }
     tmp_circle_rxy:     resw    COLUMN_CIRCLES
     extern_circle_rxy:  resw    COLUMN_CIRCLES
@@ -47,6 +49,8 @@ section .data
     coord_msg:  db  "x:%d y:%d // %d", 10, 10, 0
     msg_aled:   db  "ALED", 10, 10, 0
     test_msg:   db  "TEST MSG : %d", 10, 0
+
+    palette:    dd  0x0ebeff, 0x29b0f7, 0x44a2ee, 0x5e95e6, 0x7987dd, 0x9479d5, 0xaf6bcc, 0xc95ec4, 0xe450bb, 0xff42b3
 
 ;##################################################
 
@@ -66,11 +70,11 @@ mov word[extern_circle_rxy + WORD * 0], RAYON_EXTERN    ; r
 mov word[extern_circle_rxy + WORD * 1], (WIDTH / 2)     ; x
 mov word[extern_circle_rxy + WORD * 2], (WIDTH / 2)     ; y
 
-mov byte[i], 0
+mov word[i], 0
 boucle_cercle:
 
     ; mul utilise rdx:rax
-    movzx rax, byte[i]
+    movzx rax, word[i]
     mov rbx, COLUMN_CIRCLES
     mul rbx
     ; rax = i * COLUMN_CIRCLES
@@ -85,15 +89,15 @@ boucle_cercle:
 
     cercle_est_en_collision:
 
-    mov byte[j], 0
+    mov word[j], 0
     boucle_random:
 
         ; Si on défini le rayon -> tmp[0] : le max est different de x et y
-        cmp byte[j], 0
+        cmp word[j], 0
         jne boucle_rand__xy
 
         ; Si on défini le rayon d'un cercle init ou non
-        cmp byte[i], NB_CERCLES_INIT
+        cmp word[i], NB_CERCLES_INIT
         jb boucle_rand__rayon_init
 
         ; rayon d'un cercle pas init : pas de random
@@ -114,17 +118,17 @@ boucle_cercle:
         ; ax = random_number
 
         ; Si on définie le rayon alors on n'applique aucun changement sur le nombre aleatoire
-        cmp byte[j], 0
+        cmp word[j], 0
         je def_tmp
         ; Sinon, pour x et y, on rajoute DISTANCE_FENETRE_EXTERNE (voir calcul etape 3)
         add ax, DISTANCE_FENETRE_EXTERNE
 
         def_tmp:
-        movzx rcx, byte[j] ; rcx = j
+        movzx rcx, word[j] ; rcx = j
         mov word[tmp_circle_rxy + WORD * (rcx)], ax ; tmp[j] (word)
 
-    inc byte[j]
-    cmp byte[j], COLUMN_CIRCLES
+    inc word[j]
+    cmp word[j], COLUMN_CIRCLES
     jne boucle_random
 
     ;=====================================
@@ -135,13 +139,13 @@ boucle_cercle:
     ;=====================================
 
     ; Si on est au premier cercle dessiner, on ne regarde pas
-    cmp byte[i], 0
+    cmp word[i], 0
     je fin_boucle_collision
 
-    mov byte[j], 0
+    mov word[j], 0
     boucle_collision:
 
-        movzx r8, byte[j]
+        movzx r8, word[j]
         mov rax, COLUMN_CIRCLES
         mul r8      ; r8 *= rax
         mov r8, rax ; r8 = j * COLUMN_CIRCLES        
@@ -161,7 +165,7 @@ boucle_cercle:
         ;------------------------------------------
         
         ; On verifie un cercle init la somme est de : tmp[0] + cercles[j][0]
-        cmp byte[i], NB_CERCLES_INIT
+        cmp word[i], NB_CERCLES_INIT
         jb somme_rayons
         ; Sinon le rayon de tmp est de 0, la somme est donc : cercles[j][0]
         movzx rdx, word[circles_rxy + WORD * (r8)]  ; cercles[j][0] 
@@ -188,7 +192,7 @@ boucle_cercle:
         ;------------------------------------------
 
         ; Si il s'agit d'un cercle init on ne change pas son rayon
-        cmp byte[i], NB_CERCLES_INIT
+        cmp word[i], NB_CERCLES_INIT
         jb init_ou_pas_proche
 
         ; Si le rayon du cercle n'est pas égal à 0
@@ -218,10 +222,10 @@ boucle_cercle:
 
         ;------------------------------------------
 
-    inc byte[j]
+    inc word[j]
     ; Si j == i alors on a déjà parcouru tout les cercles exsitants, on arrete la boucle
-    mov al, byte[i]
-    cmp byte[j], al
+    mov ax, word[i]
+    cmp word[j], ax
     jne boucle_collision
     
     fin_boucle_collision:
@@ -257,10 +261,10 @@ boucle_cercle:
 
     ;=====================================
 
-    mov byte[j], 0 
+    mov word[j], 0 
     boucle_init_cercle:
 
-        movzx r8, byte[j]   ; r8  = j
+        movzx r8, word[j]   ; r8  = j
         mov rax, rbx        ; rax = COLUMN_CIRCLES * i
         add rax, r8         ; rax = j + COLUMN_CIRCLES * i
 
@@ -268,14 +272,14 @@ boucle_cercle:
 
         mov word[circles_rxy + WORD * (rax)], cx  ; circles_rxy[i][j] (word)
     
-    inc byte[j]
-    cmp byte[j], COLUMN_CIRCLES
+    inc word[j]
+    cmp word[j], COLUMN_CIRCLES
     jne boucle_init_cercle
 
     ;=====================================
 
-inc byte[i]
-cmp byte[i], NB_CERCLES
+inc word[i]
+cmp word[i], NB_CERCLES
 jne boucle_cercle
 
 
@@ -347,50 +351,65 @@ je closeDisplay						; on saute au label 'closeDisplay' qui ferme la fenêtre
 
 dessin:
 
-; ;------------------------------------------
-; ;        Afficher le cercle externe
-; ;------------------------------------------
-;     mov rdi, qword[display_name]
-;     mov rsi, qword[window]
-;     mov rdx, qword[gc]
-;     mov cx,  word[extern_circle_rxy + WORD * 0]
-;     mov r8w, word[extern_circle_rxy + WORD * 1]
-;     mov r9w, word[extern_circle_rxy + WORD * 2]
-;     push 0xFF00FF   ; purpule
-;     call draw_circle
-; ;------------------------------------------
-
-mov byte[i], 0
-boucle_dessin:
-
-    ; mul utilise rdx:rax
-    movzx rax, byte[i]
-    mov rbx, COLUMN_CIRCLES
-    mul rbx
-    ; rax = i * COLUMN_CIRCLES
-
+;------------------------------------------
+;        Afficher le cercle externe
+;------------------------------------------
     mov rdi, qword[display_name]
     mov rsi, qword[window]
     mov rdx, qword[gc]
+    mov cx,  word[extern_circle_rxy + WORD * 0]
+    mov r8w, word[extern_circle_rxy + WORD * 1]
+    mov r9w, word[extern_circle_rxy + WORD * 2]
+    push 0xFF00FF   ; purpule
+    call draw_circle
+;------------------------------------------
+
+mov word[i], 0
+boucle_dessin:
+
+    ; mul utilise rdx:rax
+    movzx rax, word[i]
+    mov rbx, COLUMN_CIRCLES
+    mul rbx     ; met le resultat dans rax 
+    ; rax = i * COLUMN_CIRCLES
 
     mov cx,  word[circles_rxy + WORD * (rax + 0)]   ; circles_rxy[i][0] : RAYON du CERCLE (word)
-    mov r8w, word[circles_rxy + WORD * (rax + 1)]   ; circles_rxy[i][1] : COORDONNEE en X DU CERCLE (word)
-    mov r9w, word[circles_rxy + WORD * (rax + 2)]   ; circles_rxy[i][2] : COORDONNEE en Y DU CERCLE (word)
+    mov word[j], 0
 
-    cmp byte[i], NB_CERCLES_INIT
-    jae color_white
+    boucle_cercle_concentrique:
+        
+        push rcx
+        push rax
 
-    push 0xFF0000   ; red
-    jmp dessiner_cercle
+        mov rdi, qword[display_name]
+        mov rsi, qword[window]
+        mov rdx, qword[gc]
 
-    color_white:
-    push 0xFFFFFF   ; white : COULEUR du crayon en hexa (dword mais en vrai -> 3 octets : 0xRRGGBB)
+        mov r8w, word[circles_rxy + WORD * (rax + 1)]   ; circles_rxy[i][1] : COORDONNEE en X DU CERCLE (word)
+        mov r9w, word[circles_rxy + WORD * (rax + 2)]   ; circles_rxy[i][2] : COORDONNEE en Y DU CERCLE (word)
 
-    dessiner_cercle:
-    call draw_circle
+        movzx rbx, word[j]
+        mov ebx, dword[palette + DWORD * rbx]
+        push rbx     ; mettre la couleur du tableau
+        call draw_circle
 
-inc byte[i]
-cmp byte[i], NB_CERCLES
+        
+        pop rcx     ; enlever 0xFF0000
+        pop rax     ; Save rax
+        pop rcx     ; recupere le rayon cx
+
+        inc word[j]
+        cmp word[j], LEN_PALETTE    
+        jb len_palette_unreached 
+        mov word[j], 0        
+        len_palette_unreached:
+    
+    sub cx, 1
+    cmp cx, 0
+    jg boucle_cercle_concentrique
+
+inc word[i]
+cmp word[i], NB_CERCLES
 jne boucle_dessin
 
 

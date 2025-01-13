@@ -11,11 +11,13 @@ extern distance_points
 
 %include "etapes/common.asm"
 
-%define NB_CERCLES 100
+%define NB_CERCLES 1000
 %define NB_CERCLES_INIT 5
 
 %define COLUMN_CIRCLES 3 ; { r , x , y }
 %define MAX_RAYON (WIDTH / 2)
+
+%define LEN_PALETTE 10
 
 ;##################################################
 
@@ -27,8 +29,8 @@ section .bss
     window:         resq	1
     gc:             resq	1
 
-    i:              resb    1
-    j:              resb    1
+    i:              resw    1
+    j:              resw    1
     circles_rxy:    resw    NB_CERCLES * COLUMN_CIRCLES   ; nb de cercles * { r , x , y }
     tmp_circle_rxy: resw    COLUMN_CIRCLES
 
@@ -44,6 +46,9 @@ section .data
     msg_aled:   db  "ALED", 10, 10, 0
     test_msg:   db  "TEST MSG : %d", 10, 0
 
+    palette:    dd  0x0ebeff, 0x29b0f7, 0x44a2ee, 0x5e95e6, 0x7987dd, 0x9479d5, 0xaf6bcc, 0xc95ec4, 0xe450bb, 0xff42b3
+
+
 ;##################################################
 
 section .text
@@ -57,11 +62,11 @@ main:
 ; Mettez ici votre code qui devra s'exécuter avant le dessin
 ;###########################################################
 
-mov byte[i], 0
+mov word[i], 0
 boucle_cercle:
 
     ; mul utilise rdx:rax
-    movzx rax, byte[i]
+    movzx rax, word[i]
     mov rbx, COLUMN_CIRCLES
     mul rbx
     ; rax = i * COLUMN_CIRCLES
@@ -76,15 +81,15 @@ boucle_cercle:
 
     cercle_est_en_collision:
 
-    mov byte[j], 0
+    mov word[j], 0
     boucle_random:
 
         ; Si on défini le rayon -> tmp[0] : le max est different de x et y
-        cmp byte[j], 0
+        cmp word[j], 0
         jne boucle_rand__xy
 
         ; Si on défini le rayon d'un cercle init ou non
-        cmp byte[i], NB_CERCLES_INIT
+        cmp word[i], NB_CERCLES_INIT
         jb boucle_rand__rayon_init
 
         ; rayon d'un cercle pas init : pas de random
@@ -104,11 +109,11 @@ boucle_cercle:
         ; ax = random_number
 
         def_tmp:
-        movzx rcx, byte[j] ; rcx = j
+        movzx rcx, word[j] ; rcx = j
         mov word[tmp_circle_rxy + WORD * (rcx)], ax ; tmp[j] (word)
 
-    inc byte[j]
-    cmp byte[j], COLUMN_CIRCLES
+    inc word[j]
+    cmp word[j], COLUMN_CIRCLES
     jne boucle_random
 
     ;=====================================
@@ -119,13 +124,13 @@ boucle_cercle:
     ;=====================================
 
     ; Si on est au premier cercle dessiner, on ne regarde pas
-    cmp byte[i], 0
+    cmp word[i], 0
     je fin_boucle_collision
 
-    mov byte[j], 0
+    mov word[j], 0
     boucle_collision:
 
-        movzx r8, byte[j]
+        movzx r8, word[j]
         mov rax, COLUMN_CIRCLES
         mul r8      ; r8 *= rax
         mov r8, rax ; r8 = j * COLUMN_CIRCLES        
@@ -145,7 +150,7 @@ boucle_cercle:
         ;------------------------------------------
         
         ; On verifie un cercle init la somme est de : tmp[0] + cercles[j][0]
-        cmp byte[i], NB_CERCLES_INIT
+        cmp word[i], NB_CERCLES_INIT
         jb somme_rayons
         ; Sinon le rayon de tmp est de 0, la somme est donc : cercles[j][0]
         movzx rdx, word[circles_rxy + WORD * (r8)]  ; cercles[j][0] 
@@ -172,7 +177,7 @@ boucle_cercle:
         ;------------------------------------------
 
         ; Si il s'agit d'un cercle init on ne change pas son rayon
-        cmp byte[i], NB_CERCLES_INIT
+        cmp word[i], NB_CERCLES_INIT
         jb init_ou_pas_proche
 
         ; Si le rayon du cercle n'est pas égal à 0
@@ -202,10 +207,10 @@ boucle_cercle:
 
         ;------------------------------------------
 
-    inc byte[j]
+    inc word[j]
     ; Si j == i alors on a déjà parcouru tout les cercles exsitants, on arrete la boucle
-    mov al, byte[i]
-    cmp byte[j], al
+    mov ax, word[i]
+    cmp word[j], ax
     jne boucle_collision
     
     fin_boucle_collision:
@@ -216,10 +221,10 @@ boucle_cercle:
 
     ;=====================================
 
-    mov byte[j], 0 
+    mov word[j], 0 
     boucle_init_cercle:
 
-        movzx r8, byte[j]   ; r8  = j
+        movzx r8, word[j]   ; r8  = j
         mov rax, rbx        ; rax = COLUMN_CIRCLES * i
         add rax, r8         ; rax = j + COLUMN_CIRCLES * i
 
@@ -227,14 +232,14 @@ boucle_cercle:
 
         mov word[circles_rxy + WORD * (rax)], cx  ; circles_rxy[i][j] (word)
     
-    inc byte[j]
-    cmp byte[j], COLUMN_CIRCLES
+    inc word[j]
+    cmp word[j], COLUMN_CIRCLES
     jne boucle_init_cercle
 
     ;=====================================
 
-inc byte[i]
-cmp byte[i], NB_CERCLES
+inc word[i]
+cmp word[i], NB_CERCLES
 jne boucle_cercle
 
 
@@ -306,24 +311,22 @@ je closeDisplay						; on saute au label 'closeDisplay' qui ferme la fenêtre
 
 dessin:
 
-mov byte[i], 0
-; mov byte[i], (NB_CERCLES - 1 * 2)
+mov word[i], 0
 boucle_dessin:
 
     ; mul utilise rdx:rax
-    movzx rax, byte[i]
+    movzx rax, word[i]
     mov rbx, COLUMN_CIRCLES
-    mul rbx
+    mul rbx     ; met le resultat dans rax 
     ; rax = i * COLUMN_CIRCLES
 
-    mov cx, word[circles_rxy + WORD * (rax + 0)]
-    ; cx = circles_rxy[i][0] : RAYON du CERCLE (word)
+    mov cx,  word[circles_rxy + WORD * (rax + 0)]   ; circles_rxy[i][0] : RAYON du CERCLE (word)
+    mov word[j], 0
 
-    mov byte[j], 0
     boucle_cercle_concentrique:
-
-        push rax ; save (i * COLUMN_CIRCLES)
-        push rcx ; save le rayon
+        
+        push rcx
+        push rax
 
         mov rdi, qword[display_name]
         mov rsi, qword[window]
@@ -332,21 +335,31 @@ boucle_dessin:
         mov r8w, word[circles_rxy + WORD * (rax + 1)]   ; circles_rxy[i][1] : COORDONNEE en X DU CERCLE (word)
         mov r9w, word[circles_rxy + WORD * (rax + 2)]   ; circles_rxy[i][2] : COORDONNEE en Y DU CERCLE (word)
 
-        push 0xFF0000   ; Couleur du trait
-
+        movzx rbx, word[j]
+        mov ebx, dword[palette + DWORD * rbx]
+        push rbx     ; mettre la couleur du tableau
         call draw_circle
 
-        pop rdi ; Pour nettoyer la pile (-> 0xFFFFFF ou 0xFF0000)
-        pop rcx ; Pour recup le rayon
-        pop rax ; Pour recup (i * COLUMN_CIRCLES)
+        
+        pop rcx     ; enlever 0xFF0000
+        pop rax     ; Save rax
+        pop rcx     ; recupere le rayon cx
 
-    sub cx, 5
+        inc word[j]
+        cmp word[j], LEN_PALETTE    
+        jb len_palette_unreached 
+        mov word[j], 0        
+        len_palette_unreached:
+    
+    sub cx, 1
     cmp cx, 0
     jg boucle_cercle_concentrique
 
-inc byte[i]
-cmp byte[i], NB_CERCLES
+inc word[i]
+cmp word[i], NB_CERCLES
 jne boucle_dessin
+
+
 
 ; ############################
 ; # FIN DE LA ZONE DE DESSIN #
