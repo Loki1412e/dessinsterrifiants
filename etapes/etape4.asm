@@ -2,23 +2,54 @@
 ;###########       Etape 4       ##################
 ;##################################################
 
+; my external functions from ./functions/
+extern random_number
+extern draw_circle
+extern distance_points
+
+;##################################################
+
 %include "etapes/common.asm"
+
+%define NB_CERCLES 1000
+%define NB_CERCLES_INIT 5
+
+%define COLUMN_CIRCLES 3 ; { r , x , y }
+%define MAX_RAYON (WIDTH / 2)
+
+%define LEN_PALETTE 10
+
+;##################################################
 
 section .bss
     display_name:	resq	1
     screen:			resd	1
     depth:         	resd	1
     connection:    	resd	1
-    width:         	resd	1
-    height:        	resd	1
-    window:		resq	1
-    gc:		resq	1
+    window:         resq	1
+    gc:             resq	1
 
-    my_rayon:   resw    1
+    i:              resw    1
+    j:              resw    1
+    circles_rxy:    resw    NB_CERCLES * COLUMN_CIRCLES   ; nb de cercles * { r , x , y }
+    tmp_circle_rxy: resw    COLUMN_CIRCLES
+
+;##################################################
 
 section .data
     event:		times	24 dq 0
 
+    msg_start:  db  "--- DEBUT ---", 10, 10, 0
+    msg_end:    db  "--- FIN ---", 10, 10, 0
+    int_msg:    db  "%d : %d // %d", 10, 10, 0
+    coord_msg:  db  "x:%d y:%d // %d", 10, 10, 0
+    msg_aled:   db  "ALED", 10, 10, 0
+    test_msg:   db  "TEST MSG : %d", 10, 0
+
+    palette:    dd  0x0ebeff, 0x29b0f7, 0x44a2ee, 0x5e95e6, 0x7987dd, 0x9479d5, 0xaf6bcc, 0xc95ec4, 0xe450bb, 0xff42b3
+
+
+;##################################################
 
 section .text
 	
@@ -31,8 +62,185 @@ main:
 ; Mettez ici votre code qui devra s'exécuter avant le dessin
 ;###########################################################
 
+mov word[i], 0
+boucle_cercle:
 
+    ; mul utilise rdx:rax
+    movzx rax, word[i]
+    mov rbx, COLUMN_CIRCLES
+    mul rbx
+    ; rax = i * COLUMN_CIRCLES
+    mov rbx, rax
+    ; rbx = i * COLUMN_CIRCLES
 
+    ;=====================================
+
+    ; Calcul d'un cercle aléatoire
+
+    ;=====================================
+
+    cercle_est_en_collision:
+
+    mov word[j], 0
+    boucle_random:
+
+        ; Si on défini le rayon -> tmp[0] : le max est different de x et y
+        cmp word[j], 0
+        jne boucle_rand__xy
+
+        ; Si on défini le rayon d'un cercle init ou non
+        cmp word[i], NB_CERCLES_INIT
+        jb boucle_rand__rayon_init
+
+        ; rayon d'un cercle pas init : pas de random
+        mov ax, 0   ; on initialise à 0
+        jmp def_tmp
+
+        ; rayon d'un cercle init
+        boucle_rand__rayon_init:
+        mov di, MAX_RAYON   ; Rayon max CERCLE INIT random
+        jmp boucle_rand_calcul
+
+        boucle_rand__xy:
+        mov di, WIDTH  ; Maximum pour x et y
+
+        boucle_rand_calcul:
+        call random_number
+        ; ax = random_number
+
+        def_tmp:
+        movzx rcx, word[j] ; rcx = j
+        mov word[tmp_circle_rxy + WORD * (rcx)], ax ; tmp[j] (word)
+
+    inc word[j]
+    cmp word[j], COLUMN_CIRCLES
+    jne boucle_random
+
+    ;=====================================
+
+    ; On vérifie si [tmp_circle_rxy] ne rentre pas en collision avec un des cercles déjà calculés
+    ; Sinon on renvoie vers boucle_rand__tmp_cricle
+
+    ;=====================================
+
+    ; Si on est au premier cercle dessiner, on ne regarde pas
+    cmp word[i], 0
+    je fin_boucle_collision
+
+    mov word[j], 0
+    boucle_collision:
+
+        movzx r8, word[j]
+        mov rax, COLUMN_CIRCLES
+        mul r8      ; r8 *= rax
+        mov r8, rax ; r8 = j * COLUMN_CIRCLES        
+
+        movzx rdi, word[circles_rxy + WORD * (r8 + 1)]  ; x1 -> cercle[j][1]
+        movzx rsi, word[circles_rxy + WORD * (r8 + 2)]  ; y1 -> cercle[j][2]
+        movzx rdx, word[tmp_circle_rxy + WORD * (1)]    ; x2 -> tmp[1]
+        movzx rcx, word[tmp_circle_rxy + WORD * (2)]    ; y2 -> tmp[2]
+        call distance_points
+        ; rax = la ditance entre les deux points
+
+        ;------------------------------------------
+        
+        ; Pour eviter de recalculer un nouveau cercle si le changement de rayon cause
+        ; une collision avec un cercle pas encore calculer dans la boucle [j] :
+
+        ;------------------------------------------
+        
+        ; On verifie un cercle init la somme est de : tmp[0] + cercles[j][0]
+        cmp word[i], NB_CERCLES_INIT
+        jb somme_rayons
+        ; Sinon le rayon de tmp est de 0, la somme est donc : cercles[j][0]
+        movzx rdx, word[circles_rxy + WORD * (r8)]  ; cercles[j][0] 
+        jmp distance_inferieure_rayon
+
+        somme_rayons:
+        ; Somme des rayons
+        movzx rdx, word[tmp_circle_rxy]             ; tmp_cercle[0]
+        movzx rsi, word[circles_rxy + WORD * (r8)]  ; cercles[j][0]
+        add rdx, rsi
+        ; rdx = (somme des rayons) = (rayon_tmp + rayon_cerlce[j])
+
+        distance_inferieure_rayon:
+        ; Si distance <= sum(rayons):
+        cmp rax, rdx
+        jbe cercle_est_en_collision
+
+        ;------------------------------------------
+
+        ; ETAPE 2
+
+        ; On change le rayon pour etre tangent au cercle le plus proche si pas cercle init
+
+        ;------------------------------------------
+
+        ; Si il s'agit d'un cercle init on ne change pas son rayon
+        cmp word[i], NB_CERCLES_INIT
+        jb init_ou_pas_proche
+
+        ; Si le rayon du cercle n'est pas égal à 0
+        ; On calcul le plus proche
+        cmp word[tmp_circle_rxy], 0
+        jne calc_proche
+        ; Sinon on initialise le rayon au max + 1 pour pouvoir calculer le plus proche
+        mov word[tmp_circle_rxy], MAX_RAYON + 1
+
+        calc_proche:
+        ; (distance - cerlces[j][0])
+        movzx rdx, word[circles_rxy + WORD * (r8)]  ; rayon -> cerlces[j][0]
+        ; rax = distance
+        ; rdx = cerlces[j][0] -> rayon
+        sub rax, rdx    ; rax = distance - rayon_cercle
+
+        ; Si (distance - rayon_cercle) >= tmp_rayon
+        ; Alors tmp_rayon ne change pas
+        cmp ax, word[tmp_circle_rxy]
+        jae init_ou_pas_proche
+
+        ; On change le rayon si le nouveau est plus petit
+        ; rax = nouveau rayon = (distance - rayon_cercle)
+        mov word[tmp_circle_rxy], ax
+
+        init_ou_pas_proche:
+
+        ;------------------------------------------
+
+    inc word[j]
+    ; Si j == i alors on a déjà parcouru tout les cercles exsitants, on arrete la boucle
+    mov ax, word[i]
+    cmp word[j], ax
+    jne boucle_collision
+    
+    fin_boucle_collision:
+
+    ;=====================================
+
+    ; On ajoute le tmp_cricle dans le tableau des cercles
+
+    ;=====================================
+
+    mov word[j], 0 
+    boucle_init_cercle:
+
+        movzx r8, word[j]   ; r8  = j
+        mov rax, rbx        ; rax = COLUMN_CIRCLES * i
+        add rax, r8         ; rax = j + COLUMN_CIRCLES * i
+
+        mov cx, word[tmp_circle_rxy + WORD * (r8)]
+
+        mov word[circles_rxy + WORD * (rax)], cx  ; circles_rxy[i][j] (word)
+    
+    inc word[j]
+    cmp word[j], COLUMN_CIRCLES
+    jne boucle_init_cercle
+
+    ;=====================================
+
+inc word[i]
+cmp word[i], NB_CERCLES
+jne boucle_cercle
 
 
 ;###############################
@@ -59,7 +267,7 @@ mov rdx,10
 mov rcx,10
 mov r8,WIDTH	; largeur
 mov r9,HEIGHT	; hauteur
-push 0xFFFFFF	; background  0xRRGGBB
+push 0x000000	; background  0xRRGGBB
 push 0x00FF00
 push 1
 call XCreateSimpleWindow
@@ -100,39 +308,58 @@ je closeDisplay						; on saute au label 'closeDisplay' qui ferme la fenêtre
 ;#########################################
 ;#		DEBUT DE LA ZONE DE DESSIN		 #
 ;#########################################
+
 dessin:
 
-;couleur du cercle 1
-mov rdi,qword[display_name]
-mov rsi,qword[gc]
-mov edx,0xFF00FF	; Couleur du crayon en hexa ; rouge
-call XSetForeground
+mov word[i], 0
+boucle_dessin:
 
-mov word[my_rayon], 50
+    ; mul utilise rdx:rax
+    movzx rax, word[i]
+    mov rbx, COLUMN_CIRCLES
+    mul rbx     ; met le resultat dans rax 
+    ; rax = i * COLUMN_CIRCLES
 
-; Dessin du cercle 1
-mov rdi,qword[display_name]
-mov rsi,qword[window]		
-mov rdx,qword[gc]			
+    mov cx,  word[circles_rxy + WORD * (rax + 0)]   ; circles_rxy[i][0] : RAYON du CERCLE (word)
+    mov word[j], 0
 
-mov bx, HEIGHT / 2	; COORDONNEE en Y DU CERCLE
+    boucle_cercle_concentrique:
+        
+        push rcx
+        push rax
 
-mov cx,word[my_rayon]	; RAYON DU CERCLE
-sub bx,cx
-movzx rcx,bx			
+        mov rdi, qword[display_name]
+        mov rsi, qword[window]
+        mov rdx, qword[gc]
 
-mov bx, WIDTH / 2	; COORDONNEE en X DU CERCLE
+        mov r8w, word[circles_rxy + WORD * (rax + 1)]   ; circles_rxy[i][1] : COORDONNEE en X DU CERCLE (word)
+        mov r9w, word[circles_rxy + WORD * (rax + 2)]   ; circles_rxy[i][2] : COORDONNEE en Y DU CERCLE (word)
 
-mov r15w,word[my_rayon]	; RAYON DU CERCLE
-sub bx,r15w
-movzx r8,bx		
-mov r9w,word[my_rayon]	; RAYON DU CERCLE
-shl r9,1
-mov rax,23040
-push rax
-push 0
-push r9
-call XDrawArc
+        movzx rbx, word[j]
+        mov ebx, dword[palette + DWORD * rbx]
+        push rbx     ; mettre la couleur du tableau
+        call draw_circle
+
+        
+        pop rcx     ; enlever 0xFF0000
+        pop rax     ; Save rax
+        pop rcx     ; recupere le rayon cx
+
+        inc word[j]
+        cmp word[j], LEN_PALETTE    
+        jb len_palette_unreached 
+        mov word[j], 0        
+        len_palette_unreached:
+    
+    sub cx, 1
+    cmp cx, 0
+    jg boucle_cercle_concentrique
+
+inc word[i]
+cmp word[i], NB_CERCLES
+jne boucle_dessin
+
+
 
 ; ############################
 ; # FIN DE LA ZONE DE DESSIN #
@@ -152,4 +379,3 @@ closeDisplay:
     call    XCloseDisplay
     xor	    rdi,rdi
     call    exit
-	
