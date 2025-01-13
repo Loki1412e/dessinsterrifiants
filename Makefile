@@ -12,7 +12,7 @@ FUNCTIONS_SOURCES=$(wildcard $(FUNCTIONS_DIR)/*.asm)
 FUNCTIONS_OBJECTS := $(FUNCTIONS_SOURCES:.asm=.o)
 
 # Règle principale : compiler toutes les étapes
-all: etape1 etape2 etape3 etape4 etape5
+all: etape1 etape2 etape3 etape4_1 etape4_2
 	clear && \
 	echo "Les exécutables des étapes sont dans $(OUTPUT_DIR)/"
 
@@ -58,19 +58,19 @@ etape3: $(ETAPES_DIR)/etape3.asm $(FUNCTIONS_SOURCES)
 	clear && \
 	echo "$(OUTPUT_DIR)/etape3.out a été crée"
 
-etape4: $(ETAPES_DIR)/etape4.asm $(FUNCTIONS_SOURCES)
-	make assemble file=etape4
-	gcc $(ETAPES_DIR)/etape4.o $(FUNCTIONS_OBJECTS) -o $(OUTPUT_DIR)/etape4.out $(GCC_FLAGS)
-	rm -f $(ETAPES_DIR)/etape4.o $(FUNCTIONS_OBJECTS) && \
+etape4_1: $(ETAPES_DIR)/etape4_1.asm $(FUNCTIONS_SOURCES)
+	make assemble file=etape4_1
+	gcc $(ETAPES_DIR)/etape4_1.o $(FUNCTIONS_OBJECTS) -o $(OUTPUT_DIR)/etape4_1.out $(GCC_FLAGS)
+	rm -f $(ETAPES_DIR)/etape4_1.o $(FUNCTIONS_OBJECTS) && \
 	clear && \
-	echo "$(OUTPUT_DIR)/etape4.out a été crée"
+	echo "$(OUTPUT_DIR)/etape4_1.out a été crée"
 
-etape5: $(ETAPES_DIR)/etape5.asm $(FUNCTIONS_SOURCES)
-	make assemble file=etape5
-	gcc $(ETAPES_DIR)/etape5.o $(FUNCTIONS_OBJECTS) -o $(OUTPUT_DIR)/etape5.out $(GCC_FLAGS)
-	rm -f $(ETAPES_DIR)/etape5.o $(FUNCTIONS_OBJECTS) && \
+etape4_2: $(ETAPES_DIR)/etape4_2.asm $(FUNCTIONS_SOURCES)
+	make assemble file=etape4_2
+	gcc $(ETAPES_DIR)/etape4_2.o $(FUNCTIONS_OBJECTS) -o $(OUTPUT_DIR)/etape4_2.out $(GCC_FLAGS)
+	rm -f $(ETAPES_DIR)/etape4_2.o $(FUNCTIONS_OBJECTS) && \
 	clear && \
-	echo "$(OUTPUT_DIR)/etape5.out a été crée"
+	echo "$(OUTPUT_DIR)/etape4_2.out a été crée"
 
 # Nettoyage
 clean:
