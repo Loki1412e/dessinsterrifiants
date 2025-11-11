@@ -1,0 +1,61 @@
+name: 🎨 Générer les captures du projet ASM
+
+on:
+  # Permet de le lancer manuellement depuis l'onglet "Actions" de GitHub
+  workflow_dispatch:
+
+jobs:
+  build-and-capture:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: 2. 🛠️ Installer les prérequis (ASM, X11, Outils)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            nasm \
+            gcc \
+            make \
+            libx11-dev \
+            xvfb \
+            imagemagick
+
+      - name: 3. ⚙️ Compiler tous les exécutables
+        # La cible 'all' de votre Makefile génère tous les .out dans output/
+        run: make all
+
+      - name: 4. 📸 Lancer et capturer chaque étape
+        run: |
+          # Crée le dossier pour les captures
+          mkdir -p output/screenshots
+          
+          # Liste des exécutables à capturer (basé sur votre Makefile)
+          LISTE_ETAPES="etape1 etape2 etape3 etape4_1 etape4_2"
+
+          for etape in $LISTE_ETAPES; do
+            echo "--- Lancement de $etape.out sur écran virtuel... ---"
+            
+            # Lance le programme .out sur un écran virtuel en arrière-plan
+            xvfb-run --auto-servernum ./output/$etape.out &
+            XVFB_PID=$! # Récupère le PID du processus
+            
+            echo "Attente de 10 secondes pour le dessin..."
+            sleep 10
+            
+            echo "Capture de output/screenshots/$etape.png..."
+            # 'import' (d'imagemagick) prend une capture de l'écran
+            import -window root output/screenshots/$etape.png
+            
+            echo "Arrêt du processus $etape.out..."
+            kill $XVFB_PID # Arrête le programme
+            sleep 1
+          done
+
+      - name: 5. ⬆️ Publier les captures (Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: captures-circles-asm
+          path: output/screenshots/
