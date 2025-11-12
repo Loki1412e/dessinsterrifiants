@@ -27,7 +27,21 @@ jobs:
         # La cible 'all' de votre Makefile génère tous les .out dans output/
         run: make all
 
-      - name: 4. 📸 Lancer et capturer chaque étape
+      - name: 4. Extraire les dimensions de la fenêtre
+        run: |
+          echo "Lecture de etapes/common.asm pour les dimensions..."
+          # On cherche la ligne "%define WIDTH", on prend la 3ème colonne (le nombre)
+          WINDOW_WIDTH=$(grep '%define WIDTH' etapes/common.asm | awk '{print $3}')
+          # On cherche la ligne "%define HEIGHT", on prend la 3ème colonne (le nombre)
+          WINDOW_HEIGHT=$(grep '%define HEIGHT' etapes/common.asm | awk '{print $3}')
+          
+          echo "Dimensions extraites: ${WINDOW_WIDTH}x${WINDOW_HEIGHT}"
+          
+          # On exporte ces valeurs dans l'environnement du Job
+          echo "WINDOW_WIDTH=$WINDOW_WIDTH" >> $GITHUB_ENV
+          echo "WINDOW_HEIGHT=$WINDOW_HEIGHT" >> $GITHUB_ENV
+
+      - name: 5. 📸 Lancer et capturer chaque étape
         run: |
           # Crée le dossier pour les captures
           mkdir -p output/screenshots
@@ -37,11 +51,13 @@ jobs:
 
           for etape in $LISTE_ETAPES; do
             echo "--- Lancement de $etape.out sur écran virtuel... ---"
-            xvfb-run --auto-servernum sh -c "./output/$etape.out & sleep 10; import -window root output/screenshots/$etape.png"
+            # Utilise les variables $WINDOW_WIDTH et $WINDOW_HEIGHT
+            # (Note: ${...} est utilisé pour éviter que le 'x' soit confondu avec le nom de la variable)
+            xvfb-run --auto-servernum -s "-screen 0 ${WINDOW_WIDTH}x${WINDOW_HEIGHT}x24" sh -c "./output/$etape.out & sleep 10; import -window root output/screenshots/$etape.png"
             # No need to manage DISPLAY or kill Xvfb manually
           done
 
-      - name: 5. ⬆️ Publier les captures (Artifact)
+      - name: 6. ⬆️ Publier les captures (Artifact)
         uses: actions/upload-artifact@v4
         with:
           name: captures-circles-asm
